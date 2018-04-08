@@ -1,6 +1,7 @@
 library(trackeR)
 library(data.table)
 library(isofor)
+library(ggmap)
 
 #testing
 
@@ -20,6 +21,7 @@ set.seed(123456789)
 lm1 = kmeans(runDATA[,c("latitude", "longitude")], 30, nstart = 40, iter.max = 10)
 plot(runDATA[,c("latitude", "longitude")], col = (lm1$cluster+1), pch = 20, cex = 0.2)
 #change color 
+
 color.gradient <- function(x, colors=c("yellow","red"), colsteps=30) {
   return(colorRampPalette(colors) (colsteps) [ findInterval(x, seq(min(x),max(x), length.out=colsteps)) ] )
 }
@@ -62,8 +64,10 @@ calculate_dist <- function(data, clus){
   
 }
 
-detected_anomaly <- function(data){
+detected_anomaly <- function(all_coords, data, clus){
   
+  anomaly_data <- c()
+  content <- get_googlemap(center = c(data[1,]$longitude,data[1,]$latitude))
   colnames(data) <- c("x", "y", "dist", "speed")
   x <- subset(data, select = c("dist","speed"))
   
@@ -73,13 +77,19 @@ detected_anomaly <- function(data){
   col = ifelse(p > quantile(p, 0.85), "red", "blue")
   ol = ifelse(p > quantile(p, 0.85), 1, 2)
   
-  plot(x, col = col, pch = ol)
-  text(x, pos = 3, cex = 0.8, rownames(x))   
   
+  plot(x, col = col, pch = ol)
+  text(x, pos = 3, cex = 0.8, rownames(x))  
+
+  for( i in 1:length(p)){
+    if(p[i] > quantile(p, 0.85))
+    {
+      tra <- subset(all_coords, clus$cluster == i)
+      anomaly_data <- rbind(anomaly_data, tra)
+    }
+  }
+  ggmap(content) + geom_point(aes(x = longitude, y = latitude), data = all_coords, color = "blue", size = 1) + geom_point(aes(x = longitude, y = latitude), data = anomaly_data, color = "red", size = 1)
 }
 
 new_dt <- data.table(lm1$centers, calculate_dist(runDATA, lm1), calculate_speed(runDATA,lm1))
-calculate_dist(runDATA, lm1)
-calculate_speed(runDATA, lm1)
-detected_anomaly(new_dt)
-
+detected_anomaly(runDATA,new_dt, lm1)
