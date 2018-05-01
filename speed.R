@@ -2,15 +2,16 @@ library(trackeR)
 library(data.table)
 library(isofor)
 library(ggmap)
+library(e1071)
 
 #testing
 
 runDF <- readTCX(file = '/home/evgeny/My_Route(1).tcx', timezone = "GMT")
-runTr0 <- trackeRdata(runDF)
-runSummary <- summary(runTr0)
-plotRoute(runTr0, speed = FALSE)
-print(runSummary)
-plot(runSummary, group = c("total", "moving"), what = c("avgSpeed", "distance", "duration"))
+#runTr0 <- trackeRdata(runDF)
+#runSummary <- summary(runTr0)
+#plotRoute(runTr0, speed = FALSE)
+#print(runSummary)
+#plot(runSummary, group = c("total", "moving"), what = c("avgSpeed", "distance", "duration"))
 
 #parts_of_cluster
 
@@ -67,7 +68,9 @@ calculate_dist <- function(data, clus){
 detected_anomaly <- function(all_coords, data, clus){
   
   anomaly_data <- c()
-  content <- get_googlemap(center = c(data[1,]$longitude,data[1,]$latitude))
+  
+  mean_cen <- apply(clus$centers,2,mean)
+  content <- get_googlemap(center = c(mean_cen[2],mean_cen[1]), zoom = 11)
   colnames(data) <- c("x", "y", "dist", "speed")
   x <- subset(data, select = c("dist","speed"))
   
@@ -88,8 +91,29 @@ detected_anomaly <- function(all_coords, data, clus){
       anomaly_data <- rbind(anomaly_data, tra)
     }
   }
-  ggmap(content) + geom_point(aes(x = longitude, y = latitude), data = all_coords, color = "blue", size = 1) + geom_point(aes(x = longitude, y = latitude), data = anomaly_data, color = "red", size = 1)
+  ggmap(content) + geom_point(aes(x = longitude, y = latitude), data = all_coords, color = "blue", size = 0.8) + geom_point(aes(x = longitude, y = latitude), data = anomaly_data, color = "red", size = 0.8)
 }
 
+classif_bayes <- function(data){
+  
+  colnames(data) <- c("x", "y", "dist", "speed")
+  cor(data$dist, data$speed, method = c("pearson"))
+  
+  classes_speed <- ifelse(data$speed > mean(data$speed)* 1.1 | data$dist > mean(data$dist) * 1.1, "not_interesting",
+                          ifelse(data$speed < mean(data$speed) * 0.9 | data$dist < mean(data$dist)*0.9, "interesting", "casual"))
+  
+  data_new <- cbind(new_dt, classes_speed)
+  model2 <- naiveBayes(data[,3], data_new[,5])
+  pr2train <- predict(model2, data[,3])
+  t2train = table(pr2train, data_new[,5], dnn=list('Предсказано        ', 'На самом деле'))
+  
+  return(data_new)
+}
+
+classif_bayes(new_dt)
+x <- subset(runDATA, lm1$cluster == 16)
+y <- trackeRdata(x)
+calculate_speed(runDATA,lm1)
 new_dt <- data.table(lm1$centers, calculate_dist(runDATA, lm1), calculate_speed(runDATA,lm1))
 detected_anomaly(runDATA,new_dt, lm1)
+mean_cen <- apply(lm1$centers,2,mean)
