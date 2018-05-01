@@ -43,6 +43,7 @@ calculate_speed <- function(data, clus){
  
   points(clus$centers, col = color.gradient(mass_speed), cex = 4, pch = 20)
   plot(mass_speed, type = "h",lwd = 10, col = color.gradient(mass_speed))
+  abline(h = c(mean(mass_speed)*1.1,mean(mass_speed)*0.9), col = c("blue","green"), lwd = 3, lty = c(1,2))
   return(mass_speed)
 }
 
@@ -61,6 +62,7 @@ calculate_dist <- function(data, clus){
   mean_common <- mean(mass_dist)
   points(clus$centers, col = color.gradient(mass_dist), cex = 4, pch = 20)
   plot(mass_dist, type = "h",lwd = 10, col = color.gradient(mass_dist))
+  abline(h = c(mean(mass_dist)*1.1,mean(mass_dist)*0.9), col = c("blue","green"), lwd = 3, lty = c(1,2))
   return(mass_dist)
   
 }
@@ -103,17 +105,15 @@ classif_bayes <- function(data){
                           ifelse(data$speed < mean(data$speed) * 0.9 | data$dist < mean(data$dist)*0.9, "interesting", "casual"))
   
   data_new <- cbind(new_dt, classes_speed)
-  model2 <- naiveBayes(data[,3], data_new[,5])
+  dat_new <- data.frame(1:30, classes_speed)
+  model2 <- naiveBayes(data[,3], dat_new[,2])
   pr2train <- predict(model2, data[,3])
-  t2train = table(pr2train, data_new[,5], dnn=list('Предсказано        ', 'На самом деле'))
+  t2train <- table(pr2train, dat_new[,2], dnn=list('Предсказано        ', 'На самом деле'))
   
-  return(data_new)
+  return(t2train)
 }
 
-classif_bayes(new_dt)
-x <- subset(runDATA, lm1$cluster == 16)
-y <- trackeRdata(x)
-calculate_speed(runDATA,lm1)
 new_dt <- data.table(lm1$centers, calculate_dist(runDATA, lm1), calculate_speed(runDATA,lm1))
 detected_anomaly(runDATA,new_dt, lm1)
-mean_cen <- apply(lm1$centers,2,mean)
+classif_bayes(new_dt)
+calculate_speed(runDATA, lm1)
